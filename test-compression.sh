@@ -90,7 +90,7 @@ is_screenshot() {
 # Test with various screenshot naming formats
 TEST_CASES=(
     "$TEST_FILE"
-    "$TEST_DIR/Screenshot 2026-01-23 at 2.11.11 PM.png"
+    "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11 PM.png"
     "$TEST_DIR/Screen Shot 2024-12-25 at 10.30.45 AM.png"
 )
 

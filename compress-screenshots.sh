@@ -51,7 +51,7 @@ is_screenshot() {
     #
     # Examples:
     # - Screen Shot 2024-01-23 at 10.30.45 AM.png (older macOS versions)
-    # - Screenshot 2026-01-23 at 2.11.11 PM.png (macOS Catalina and later)
+    # - Screenshot 2024-01-23 at 2.11.11 PM.png (macOS Catalina and later)
     local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
     
     if [[ "$filename" =~ $pattern ]]; then
@@ -69,9 +69,12 @@ compress_png() {
         return
     fi
     
-    # Get original size
+    # Get original size with error handling
     local original_size
-    original_size=$(stat -f%z "$file")
+    if ! original_size=$(stat -f%z "$file" 2>/dev/null); then
+        log "Error: Unable to get file size for $(basename "$file")"
+        return
+    fi
     
     # Use pngquant for high-quality lossy compression
     # --quality 65-80: Instructs pngquant to use the least amount of colors required to meet or exceed the max quality
@@ -80,7 +83,10 @@ compress_png() {
     # --ext .png: Use .png extension (instead of default -fs8.png)
     if pngquant --quality=65-80 --skip-if-larger --force --ext .png "$file" >/dev/null 2>&1; then
         local new_size
-        new_size=$(stat -f%z "$file")
+        if ! new_size=$(stat -f%z "$file" 2>/dev/null); then
+            log "Compressed: $(basename "$file") - Original: ${original_size} bytes (new size unavailable)"
+            return
+        fi
         local saved=$((original_size - new_size))
         local percent=0
         if [ "$original_size" -gt 0 ]; then

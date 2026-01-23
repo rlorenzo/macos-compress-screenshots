@@ -6,7 +6,7 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 
 - 🚀 **Automatic**: Monitors your Desktop and compresses screenshots as they're created
 - 🎯 **Smart Detection**: Only processes files matching macOS screenshot naming patterns
-- 💾 **Space Saving**: Reduces file sizes using built-in macOS compression
+- 💾 **Space Saving**: Reduces file sizes using pngquant compression
 - 📊 **Logging**: Tracks all compression operations with detailed statistics
 - 🔄 **Background Service**: Runs automatically in the background via LaunchAgent
 - ⚙️ **Easy Setup**: Simple installation and uninstallation scripts
@@ -184,7 +184,7 @@ tail -n 50 ~/Library/Logs/compress-screenshots.log
    - Older macOS (Mojave 10.14 and earlier): `Screen Shot YYYY-MM-DD at H.MM.SS PM.png`
    - Hour can be 1 or 2 digits (e.g., `2` or `10`)
    - Examples: 
-     - `Screenshot 2026-01-23 at 2.11.11 PM.png` (modern macOS)
+     - `Screenshot 2024-01-23 at 2.11.11 PM.png` (modern macOS)
      - `Screen Shot 2024-12-25 at 10.30.45 AM.png` (older macOS)
 
 ## License

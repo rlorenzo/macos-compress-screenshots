@@ -13,7 +13,7 @@ This tool automatically:
 ## Example Screenshot Names
 
 The tool automatically detects and compresses files with these naming patterns:
-- `Screenshot 2026-01-23 at 2.11.11 PM.png` (macOS Catalina and later - single-digit hour)
+- `Screenshot 2024-01-23 at 2.11.11 PM.png` (macOS Catalina and later - single-digit hour)
 - `Screenshot 2024-01-23 at 2.15.30 PM.png` (macOS Catalina and later - single-digit hour)
 - `Screen Shot 2024-01-23 at 10.30.45 AM.png` (macOS Mojave and earlier - double-digit hour)
 
