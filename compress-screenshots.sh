@@ -37,10 +37,18 @@ is_screenshot() {
     local filename
     filename=$(basename "$file")
     
-    # macOS screenshots typically match these patterns:
+    # macOS screenshots match these patterns:
     # - Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png
     # - Screenshot YYYY-MM-DD at HH.MM.SS AM/PM.png
-    if [[ "$filename" =~ ^(Screen\ Shot|Screenshot)\ [0-9]{4}-[0-9]{2}-[0-9]{2}\ at\ [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}\ (AM|PM)\.png$ ]]; then
+    # The regex pattern checks for:
+    # - Prefix: "Screen Shot" or "Screenshot"
+    # - Date: YYYY-MM-DD format
+    # - Time: HH.MM.SS format (12-hour)
+    # - AM/PM indicator
+    # - Extension: .png
+    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
+    
+    if [[ "$filename" =~ $pattern ]]; then
         return 0
     fi
     return 1
@@ -102,6 +110,11 @@ monitor_directory() {
     fi
     
     # Monitor the Desktop directory for new PNG files
+    # fswatch flags:
+    #   -0: Use NUL character as line separator for safe file path handling
+    #   -e ".*": Exclude all files by default
+    #   -i "\\.png$": Include only files ending with .png
+    #   --event Created: Only monitor file creation events
     fswatch -0 -e ".*" -i "\\.png$" --event Created "$WATCH_DIR" | while IFS= read -r -d '' file
     do
         # Wait a moment to ensure file is fully written

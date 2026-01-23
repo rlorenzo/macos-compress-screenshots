@@ -74,12 +74,6 @@ Check compression activity and statistics:
 tail -f ~/Library/Logs/compress-screenshots.log
 ```
 
-### Checking Service Status
-
-```bash
-launchctl list | grep compress-screenshots
-```
-
 ### Stopping the Service
 
 ```bash

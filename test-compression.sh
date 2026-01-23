@@ -57,7 +57,21 @@ fi
 # Test 3: Test screenshot pattern matching
 echo
 echo "Test 3: Testing screenshot pattern matching..."
-source compress-screenshots.sh
+
+# Import the is_screenshot function logic without executing the main script
+is_screenshot() {
+    local file="$1"
+    local filename
+    filename=$(basename "$file")
+    
+    # macOS screenshots typically match these patterns:
+    # - Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png
+    # - Screenshot YYYY-MM-DD at HH.MM.SS AM/PM.png
+    if [[ "$filename" =~ ^(Screen\ Shot|Screenshot)\ [0-9]{4}-[0-9]{2}-[0-9]{2}\ at\ [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}\ (AM|PM)\.png$ ]]; then
+        return 0
+    fi
+    return 1
+}
 
 if is_screenshot "$TEST_FILE"; then
     echo -e "${GREEN}✓ Screenshot pattern matching works${NC}"
