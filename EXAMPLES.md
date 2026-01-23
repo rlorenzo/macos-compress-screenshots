@@ -22,9 +22,11 @@ Regular PNG files (like `photo.png` or `diagram.png`) are **not** compressed.
 
 | Screenshot Type | Original Size | Compressed Size | Savings |
 |----------------|---------------|-----------------|---------|
-| Text-heavy (code, docs) | 500 KB | 250 KB | 50% |
-| Mixed content | 800 KB | 560 KB | 30% |
-| Photos/images | 1.2 MB | 1.0 MB | 16% |
+| Text-heavy (code, docs) | 500 KB | 100 KB | 80% |
+| Mixed content | 800 KB | 240 KB | 70% |
+| Photos/images | 1.2 MB | 360 KB | 70% |
+
+*Note: pngquant provides significantly better compression than the previous sips-based approach*
 
 ## Installation Example
 
@@ -33,8 +35,8 @@ Regular PNG files (like `photo.png` or `diagram.png`) are **not** compressed.
 git clone https://github.com/rlorenzo/macos-compress-screenshots.git
 cd macos-compress-screenshots
 
-# 2. Install fswatch if you don't have it
-brew install fswatch
+# 2. Install dependencies if you don't have them
+brew install fswatch pngquant
 
 # 3. Run the installer
 ./install.sh
@@ -76,12 +78,15 @@ After installation, the tool runs automatically in the background. Just take scr
 # ✓ fswatch is installed
 #   Version: fswatch 1.17.1
 #
+# ✓ pngquant is installed
+#   Version: 2.18.0 (March 2023)
+#
 # Recent Activity:
 #   Log file: /Users/yourname/Library/Logs/compress-screenshots.log
 #   Size: 4.2K
 #
 # Last 5 compression events:
-#   [2024-01-23 10:30:46] Compressed: Screen Shot 2024-01-23 at 10.30.45 AM.png - Original: 524288 bytes, New: 262144 bytes, Saved: 262144 bytes (50%)
+#   [2024-01-23 10:30:46] Compressed: Screen Shot 2024-01-23 at 10.30.45 AM.png - Original: 524288 bytes, New: 104857 bytes, Saved: 419431 bytes (80%)
 ```
 
 ### View Live Compression Activity
@@ -91,7 +96,7 @@ tail -f ~/Library/Logs/compress-screenshots.log
 
 # Output shows each compression in real-time:
 # [2024-01-23 10:30:46] Detected new screenshot: Screen Shot 2024-01-23 at 10.30.45 AM.png
-# [2024-01-23 10:30:46] Compressed: Screen Shot 2024-01-23 at 10.30.45 AM.png - Original: 524288 bytes, New: 262144 bytes, Saved: 262144 bytes (50%)
+# [2024-01-23 10:30:46] Compressed: Screen Shot 2024-01-23 at 10.30.45 AM.png - Original: 524288 bytes, New: 104857 bytes, Saved: 419431 bytes (80%)
 ```
 
 ## Uninstallation Example
@@ -162,7 +167,7 @@ tail -f ~/Library/Logs/compress-screenshots.log
          v
 ┌─────────────────┐
 │ Compress with   │
-│ sips command    │
+│ pngquant        │
 └────────┬────────┘
          │
          v

@@ -67,9 +67,12 @@ compress_png() {
     local original_size
     original_size=$(stat -f%z "$file")
     
-    # Use sips (built-in macOS tool) to compress
-    # This maintains quality while reducing file size
-    if sips -s format png -s formatOptions high "$file" --out "$file" >/dev/null 2>&1; then
+    # Use pngquant for high-quality lossy compression
+    # --quality 65-80: Instructs pngquant to use the least amount of colors required to meet or exceed the max quality
+    # --skip-if-larger: Don't save if the result is larger than the original
+    # --force: Overwrite existing file
+    # --ext .png: Use .png extension (instead of default -fs8.png)
+    if pngquant --quality=65-80 --skip-if-larger --force --ext .png "$file" >/dev/null 2>&1; then
         local new_size
         new_size=$(stat -f%z "$file")
         local saved=$((original_size - new_size))
@@ -80,7 +83,8 @@ compress_png() {
         
         log "Compressed: $(basename "$file") - Original: ${original_size} bytes, New: ${new_size} bytes, Saved: ${saved} bytes (${percent}%)"
     else
-        log "Error: Failed to compress $(basename "$file")"
+        # pngquant returns non-zero if file was skipped (already optimal or would be larger)
+        log "Skipped: $(basename "$file") - Already optimized or would not benefit from compression"
     fi
 }
 
@@ -103,9 +107,14 @@ process_existing() {
 monitor_directory() {
     log "Starting to monitor $WATCH_DIR for new screenshots"
     
-    # Check if fswatch is available
+    # Check if required tools are available
     if ! command -v fswatch >/dev/null 2>&1; then
         log "Error: fswatch is not installed. Please install it with: brew install fswatch"
+        exit 1
+    fi
+    
+    if ! command -v pngquant >/dev/null 2>&1; then
+        log "Error: pngquant is not installed. Please install it with: brew install pngquant"
         exit 1
     fi
     

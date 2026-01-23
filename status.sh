@@ -64,6 +64,17 @@ fi
 
 echo
 
+# Check for pngquant
+if command -v pngquant >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ pngquant is installed${NC}"
+    echo "  Version: $(pngquant --version 2>&1 | head -1)"
+else
+    echo -e "${YELLOW}⚠ pngquant is not installed${NC}"
+    echo "  Install with: brew install pngquant"
+fi
+
+echo
+
 # Check log file
 if [ -f "$LOG_FILE" ]; then
     echo -e "${BLUE}Recent Activity:${NC}"

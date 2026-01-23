@@ -44,6 +44,21 @@ if ! command -v fswatch >/dev/null 2>&1; then
     fi
 fi
 
+# Check if pngquant is installed
+if ! command -v pngquant >/dev/null 2>&1; then
+    echo -e "${YELLOW}Warning: pngquant is not installed${NC}"
+    echo "pngquant is required to compress screenshots."
+    echo
+    echo "To install pngquant, run:"
+    echo "  brew install pngquant"
+    echo
+    read -p "Do you want to continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
 # Create installation directory
 echo "Creating installation directory..."
 mkdir -p "$INSTALL_DIR"

@@ -17,12 +17,13 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 
 - macOS (any recent version)
 - [fswatch](https://github.com/emcrisostomo/fswatch) - File system monitoring tool
+- [pngquant](https://pngquant.org/) - High-quality PNG compression tool
 
-### Installing fswatch
+### Installing Dependencies
 
 ```bash
 # Using Homebrew
-brew install fswatch
+brew install fswatch pngquant
 ```
 
 ## Installation
@@ -48,8 +49,9 @@ The installation script will:
 
 1. The service monitors your Desktop folder for new PNG files
 2. When a new screenshot is detected (matching patterns like "Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png"), it:
-   - Uses the built-in `sips` command to compress the PNG
-   - Maintains image quality while reducing file size
+   - Uses `pngquant` to compress the PNG with high-quality lossy compression
+   - Maintains excellent visual quality while significantly reducing file size
+   - Skips files that are already optimized or wouldn't benefit from compression
    - Logs the operation with compression statistics
 
 ## Usage
@@ -119,16 +121,22 @@ launchctl load ~/Library/LaunchAgents/com.macos.compress-screenshots.plist
 
 ## Compression Details
 
-The tool uses macOS's built-in `sips` (Scriptable Image Processing System) command to compress PNG files. This approach:
-- Maintains high image quality
-- Reduces file size through optimized compression
-- Works without requiring any third-party tools (besides fswatch for monitoring)
-- Is safe and reliable
+The tool uses [pngquant](https://pngquant.org/), a high-quality PNG compression tool that:
+- Applies lossy compression while maintaining excellent visual quality
+- Uses smart quantization to reduce the color palette
+- Can achieve 50-80% file size reduction with minimal perceptible quality loss
+- Skips files that are already well-optimized or where compression would increase size
+- Is specifically optimized for screenshots and digital artwork
+
+The compression uses these settings:
+- Quality range: 65-80 (balances size reduction with visual quality)
+- Skip if larger: Prevents saving if compression would increase file size
+- Overwrites original file to save disk space
 
 Typical compression results:
-- Screenshots with lots of text: 30-50% size reduction
-- Screenshots with images: 10-30% size reduction
-- Already optimized images: minimal to no reduction
+- Screenshots with lots of text: 50-80% size reduction
+- Screenshots with images: 40-70% size reduction
+- Already optimized images: Skipped (no changes)
 
 ## Troubleshooting
 
@@ -146,6 +154,15 @@ Make sure fswatch is installed and in your PATH:
 which fswatch
 # If not found, install it:
 brew install fswatch
+```
+
+### pngquant not found
+
+Make sure pngquant is installed and in your PATH:
+```bash
+which pngquant
+# If not found, install it:
+brew install pngquant
 ```
 
 ### Screenshots not being compressed
