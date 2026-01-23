@@ -13,9 +13,11 @@ This tool automatically:
 ## Example Screenshot Names
 
 The tool automatically detects and compresses files with these naming patterns:
-- `Screen Shot 2024-01-23 at 10.30.45 AM.png` (double-digit hour)
-- `Screenshot 2026-01-23 at 2.11.11 PM.png` (single-digit hour)
-- `Screenshot 2024-01-23 at 2.15.30 PM.png` (single-digit hour)
+- `Screenshot 2026-01-23 at 2.11.11 PM.png` (macOS Catalina and later - single-digit hour)
+- `Screenshot 2024-01-23 at 2.15.30 PM.png` (macOS Catalina and later - single-digit hour)
+- `Screen Shot 2024-01-23 at 10.30.45 AM.png` (macOS Mojave and earlier - double-digit hour)
+
+**Why both patterns?** macOS changed the screenshot naming from "Screen Shot" (two words) to "Screenshot" (one word) starting with macOS Catalina (10.15). This tool supports both for backward compatibility with older screenshots.
 
 Note: The hour can be 1 or 2 digits (e.g., `2` or `10`), while minutes and seconds are always 2 digits.
 

@@ -77,8 +77,8 @@ is_screenshot() {
     filename=$(basename "$file")
     
     # macOS screenshots match these patterns:
-    # - Screen Shot YYYY-MM-DD at H.MM.SS AM/PM.png (e.g., Screen Shot 2024-01-23 at 10.30.45 AM.png)
-    # - Screenshot YYYY-MM-DD at H.MM.SS AM/PM.png (e.g., Screenshot 2026-01-23 at 2.11.11 PM.png)
+    # - "Screen Shot" (two words): Used in macOS Mojave (10.14) and earlier
+    # - "Screenshot" (one word): Used in macOS Catalina (10.15) and later
     local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
     
     if [[ "$filename" =~ $pattern ]]; then

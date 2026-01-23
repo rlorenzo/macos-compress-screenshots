@@ -48,11 +48,13 @@ The installation script will:
 ## How It Works
 
 1. The service monitors your Desktop folder for new PNG files
-2. When a new screenshot is detected (matching patterns like "Screen Shot YYYY-MM-DD at H.MM.SS PM.png" or "Screenshot YYYY-MM-DD at H.MM.SS PM.png"), it:
+2. When a new screenshot is detected (matching patterns like "Screenshot YYYY-MM-DD at H.MM.SS PM.png" for modern macOS, or "Screen Shot YYYY-MM-DD at H.MM.SS PM.png" for older versions), it:
    - Uses `pngquant` to compress the PNG with high-quality lossy compression
    - Maintains excellent visual quality while significantly reducing file size
    - Skips files that are already optimized or wouldn't benefit from compression
    - Logs the operation with compression statistics
+
+**Note:** macOS changed screenshot naming from "Screen Shot" (two words) in Mojave and earlier to "Screenshot" (one word) starting with Catalina. This tool supports both formats for backward compatibility.
 
 ## Usage
 
@@ -178,9 +180,12 @@ tail -n 50 ~/Library/Logs/compress-screenshots.log
 ```
 
 3. Ensure your screenshots match the expected naming pattern:
-   - "Screen Shot YYYY-MM-DD at H.MM.SS PM.png" (hour can be 1 or 2 digits)
-   - "Screenshot YYYY-MM-DD at H.MM.SS PM.png" (hour can be 1 or 2 digits)
-   - Examples: `Screenshot 2026-01-23 at 2.11.11 PM.png` or `Screen Shot 2024-12-25 at 10.30.45 AM.png`
+   - Modern macOS (Catalina 10.15+): `Screenshot YYYY-MM-DD at H.MM.SS PM.png`
+   - Older macOS (Mojave 10.14 and earlier): `Screen Shot YYYY-MM-DD at H.MM.SS PM.png`
+   - Hour can be 1 or 2 digits (e.g., `2` or `10`)
+   - Examples: 
+     - `Screenshot 2026-01-23 at 2.11.11 PM.png` (modern macOS)
+     - `Screen Shot 2024-12-25 at 10.30.45 AM.png` (older macOS)
 
 ## License
 
