@@ -92,10 +92,16 @@ else
     exit 1
 fi
 
-# Test 4: Test compression
+# Test 4: Test compression with pngquant
 echo
 echo "Test 4: Testing PNG compression with pngquant..."
-ORIGINAL_SIZE=$(stat -f%z "$TEST_FILE" 2>/dev/null || stat -c%s "$TEST_FILE" 2>/dev/null)
+
+# Get original size (handle both macOS and Linux stat)
+if stat -f%z "$TEST_FILE" >/dev/null 2>&1; then
+    ORIGINAL_SIZE=$(stat -f%z "$TEST_FILE")
+else
+    ORIGINAL_SIZE=$(stat -c%s "$TEST_FILE")
+fi
 echo "Original size: $ORIGINAL_SIZE bytes"
 
 # Make a copy to test compression
@@ -103,7 +109,12 @@ TEST_COPY="$TEST_DIR/test-copy.png"
 cp "$TEST_FILE" "$TEST_COPY"
 
 if pngquant --quality=65-80 --skip-if-larger --force --ext .png "$TEST_COPY" >/dev/null 2>&1; then
-    NEW_SIZE=$(stat -f%z "$TEST_COPY" 2>/dev/null || stat -c%s "$TEST_COPY" 2>/dev/null)
+    # Get new size (handle both macOS and Linux stat)
+    if stat -f%z "$TEST_COPY" >/dev/null 2>&1; then
+        NEW_SIZE=$(stat -f%z "$TEST_COPY")
+    else
+        NEW_SIZE=$(stat -c%s "$TEST_COPY")
+    fi
     echo "Compressed size: $NEW_SIZE bytes"
     
     if [ -f "$TEST_COPY" ]; then
