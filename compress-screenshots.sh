@@ -77,7 +77,7 @@ compress_png() {
     fi
     
     # Use pngquant for high-quality lossy compression
-    # --quality 65-80: Instructs pngquant to use the least amount of colors required to meet or exceed the max quality
+    # --quality 65-80: Sets an acceptable quality range (min 65, max 80); pngquant tries to use the highest quality within this range while achieving good compression
     # --skip-if-larger: Don't save if the result is larger than the original
     # --force: Overwrite existing file
     # --ext .png: Use .png extension (instead of default -fs8.png)

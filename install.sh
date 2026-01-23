@@ -71,11 +71,21 @@ if [ ! -f "compress-screenshots.sh" ]; then
     echo "Please run install.sh from the directory that contains compress-screenshots.sh."
     exit 1
 fi
+if [ ! -f "compress-screenshots.sh" ]; then
+    echo -e "${RED}Error: compress-screenshots.sh not found in the current directory: $(pwd)${NC}"
+    echo "Please run install.sh from the directory that contains compress-screenshots.sh."
+    exit 1
+fi
 cp compress-screenshots.sh "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/compress-screenshots.sh"
 
 # Create LaunchAgent plist
 echo "Installing LaunchAgent..."
+if [ ! -f "com.macos.compress-screenshots.plist" ]; then
+    echo -e "${RED}Error: Template plist file 'com.macos.compress-screenshots.plist' not found.${NC}"
+    echo "Please run this script from the directory containing com.macos.compress-screenshots.plist."
+    exit 1
+fi
 if [ ! -f "com.macos.compress-screenshots.plist" ]; then
     echo -e "${RED}Error: Template plist file 'com.macos.compress-screenshots.plist' not found.${NC}"
     echo "Please run this script from the directory containing com.macos.compress-screenshots.plist."

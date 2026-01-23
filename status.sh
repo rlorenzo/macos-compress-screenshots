@@ -82,7 +82,7 @@ if [ -f "$LOG_FILE" ]; then
     echo "  Size: $(du -h "$LOG_FILE" | awk '{print $1}')"
     echo
     echo "Last 5 compression events:"
-    grep -E "Compressed:|started|Processing" "$LOG_FILE" | tail -5 | while IFS= read -r line; do
+    ( grep -E "Compressed:|started|Processing" "$LOG_FILE" || true ) | tail -5 | while IFS= read -r line; do
         echo "  $line"
     done
 else
