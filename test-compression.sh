@@ -76,21 +76,33 @@ is_screenshot() {
     local filename
     filename=$(basename "$file")
     
-    # macOS screenshots typically match these patterns:
-    # - Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png
-    # - Screenshot YYYY-MM-DD at HH.MM.SS AM/PM.png
-    if [[ "$filename" =~ ^(Screen\ Shot|Screenshot)\ [0-9]{4}-[0-9]{2}-[0-9]{2}\ at\ [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}\ (AM|PM)\.png$ ]]; then
+    # macOS screenshots match these patterns:
+    # - Screen Shot YYYY-MM-DD at H.MM.SS AM/PM.png (e.g., Screen Shot 2024-01-23 at 10.30.45 AM.png)
+    # - Screenshot YYYY-MM-DD at H.MM.SS AM/PM.png (e.g., Screenshot 2026-01-23 at 2.11.11 PM.png)
+    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
+    
+    if [[ "$filename" =~ $pattern ]]; then
         return 0
     fi
     return 1
 }
 
-if is_screenshot "$TEST_FILE"; then
-    echo -e "${GREEN}✓ Screenshot pattern matching works${NC}"
-else
-    echo -e "${RED}✗ Screenshot pattern matching failed${NC}"
-    exit 1
-fi
+# Test with various screenshot naming formats
+TEST_CASES=(
+    "$TEST_FILE"
+    "$TEST_DIR/Screenshot 2026-01-23 at 2.11.11 PM.png"
+    "$TEST_DIR/Screen Shot 2024-12-25 at 10.30.45 AM.png"
+)
+
+for test_case in "${TEST_CASES[@]}"; do
+    touch "$test_case"  # Create the file if it doesn't exist
+    if is_screenshot "$test_case"; then
+        echo -e "${GREEN}✓ Pattern matches: $(basename "$test_case")${NC}"
+    else
+        echo -e "${RED}✗ Pattern does not match: $(basename "$test_case")${NC}"
+        exit 1
+    fi
+done
 
 # Test 4: Test compression with pngquant
 echo

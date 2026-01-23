@@ -13,8 +13,11 @@ This tool automatically:
 ## Example Screenshot Names
 
 The tool automatically detects and compresses files with these naming patterns:
-- `Screen Shot 2024-01-23 at 10.30.45 AM.png`
-- `Screenshot 2024-01-23 at 2.15.30 PM.png`
+- `Screen Shot 2024-01-23 at 10.30.45 AM.png` (double-digit hour)
+- `Screenshot 2026-01-23 at 2.11.11 PM.png` (single-digit hour)
+- `Screenshot 2024-01-23 at 2.15.30 PM.png` (single-digit hour)
+
+Note: The hour can be 1 or 2 digits (e.g., `2` or `10`), while minutes and seconds are always 2 digits.
 
 Regular PNG files (like `photo.png` or `diagram.png`) are **not** compressed.
 

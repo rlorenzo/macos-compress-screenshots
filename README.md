@@ -48,7 +48,7 @@ The installation script will:
 ## How It Works
 
 1. The service monitors your Desktop folder for new PNG files
-2. When a new screenshot is detected (matching patterns like "Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png"), it:
+2. When a new screenshot is detected (matching patterns like "Screen Shot YYYY-MM-DD at H.MM.SS PM.png" or "Screenshot YYYY-MM-DD at H.MM.SS PM.png"), it:
    - Uses `pngquant` to compress the PNG with high-quality lossy compression
    - Maintains excellent visual quality while significantly reducing file size
    - Skips files that are already optimized or wouldn't benefit from compression
@@ -178,8 +178,9 @@ tail -n 50 ~/Library/Logs/compress-screenshots.log
 ```
 
 3. Ensure your screenshots match the expected naming pattern:
-   - "Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png"
-   - "Screenshot YYYY-MM-DD at HH.MM.SS AM/PM.png"
+   - "Screen Shot YYYY-MM-DD at H.MM.SS PM.png" (hour can be 1 or 2 digits)
+   - "Screenshot YYYY-MM-DD at H.MM.SS PM.png" (hour can be 1 or 2 digits)
+   - Examples: `Screenshot 2026-01-23 at 2.11.11 PM.png` or `Screen Shot 2024-12-25 at 10.30.45 AM.png`
 
 ## License
 
