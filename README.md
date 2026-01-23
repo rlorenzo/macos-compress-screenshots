@@ -54,6 +54,19 @@ The installation script will:
 
 Once installed, the service runs automatically in the background. Just take screenshots as normal (⌘⇧3, ⌘⇧4, ⌘⇧5), and they'll be compressed automatically!
 
+### Checking Service Status
+
+```bash
+./status.sh
+```
+
+This will show:
+- Whether the service is installed and running
+- Process ID (PID)
+- fswatch installation status
+- Recent compression activity
+- Useful commands
+
 ### Viewing Logs
 
 Check compression activity and statistics:

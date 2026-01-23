@@ -16,20 +16,26 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Function to log messages
 log() {
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    local timestamp
+    timestamp=$(date "+%Y-%m-%d %H:%M:%S")
     echo "[$timestamp] $*" >> "$LOG_FILE"
     
     # Rotate log if it gets too large
-    if [ -f "$LOG_FILE" ] && [ $(stat -f%z "$LOG_FILE") -gt $MAX_LOG_SIZE ]; then
-        mv "$LOG_FILE" "${LOG_FILE}.old"
-        echo "[$timestamp] Log rotated" >> "$LOG_FILE"
+    local log_size
+    if [ -f "$LOG_FILE" ]; then
+        log_size=$(stat -f%z "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ "$log_size" -gt "$MAX_LOG_SIZE" ]; then
+            mv "$LOG_FILE" "${LOG_FILE}.old"
+            echo "[$timestamp] Log rotated" >> "$LOG_FILE"
+        fi
     fi
 }
 
 # Function to check if file is a screenshot
 is_screenshot() {
     local file="$1"
-    local filename=$(basename "$file")
+    local filename
+    filename=$(basename "$file")
     
     # macOS screenshots typically match these patterns:
     # - Screen Shot YYYY-MM-DD at HH.MM.SS AM/PM.png
@@ -50,15 +56,17 @@ compress_png() {
     fi
     
     # Get original size
-    local original_size=$(stat -f%z "$file")
+    local original_size
+    original_size=$(stat -f%z "$file")
     
     # Use sips (built-in macOS tool) to compress
     # This maintains quality while reducing file size
     if sips -s format png -s formatOptions high "$file" --out "$file" >/dev/null 2>&1; then
-        local new_size=$(stat -f%z "$file")
+        local new_size
+        new_size=$(stat -f%z "$file")
         local saved=$((original_size - new_size))
         local percent=0
-        if [ $original_size -gt 0 ]; then
+        if [ "$original_size" -gt 0 ]; then
             percent=$((saved * 100 / original_size))
         fi
         

@@ -80,7 +80,7 @@ if sips -s format png -s formatOptions high "$TEST_FILE" --out "$TEST_FILE" >/de
         echo -e "${GREEN}✓ Compression successful${NC}"
         
         SAVED=$((ORIGINAL_SIZE - NEW_SIZE))
-        if [ $ORIGINAL_SIZE -gt 0 ]; then
+        if [ "$ORIGINAL_SIZE" -gt 0 ]; then
             PERCENT=$((SAVED * 100 / ORIGINAL_SIZE))
             echo "Saved: $SAVED bytes (${PERCENT}%)"
         fi
