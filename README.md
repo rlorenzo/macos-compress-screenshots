@@ -11,6 +11,8 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 - 🔄 **Background Service**: Runs automatically in the background via LaunchAgent
 - ⚙️ **Easy Setup**: Simple installation and uninstallation scripts
 
+> 💡 **New to this tool?** Check out [EXAMPLES.md](EXAMPLES.md) for a quick start guide with usage examples!
+
 ## Prerequisites
 
 - macOS (any recent version)
