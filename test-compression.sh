@@ -75,23 +75,31 @@ is_screenshot() {
     local file="$1"
     local filename
     filename=$(basename "$file")
-    
+
     # macOS screenshots match these patterns:
     # - "Screen Shot" (two words): Used in macOS Mojave (10.14) and earlier
     # - "Screenshot" (one word): Used in macOS Catalina (10.15) and later
-    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
-    
+    # Note: Using [^0-9] instead of a literal space to match both regular space and
+    # narrow no-break space (U+202F) that macOS uses before AM/PM
+    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[^0-9](AM|PM)\.png$'
+
     if [[ "$filename" =~ $pattern ]]; then
         return 0
     fi
     return 1
 }
 
+# Narrow no-break space (U+202F) used by macOS before AM/PM
+# Using printf with octal codes since bash 3.2 doesn't support \u escapes
+NNBSP=$(printf '\342\200\257')
+
 # Test with various screenshot naming formats
+# Note: macOS uses narrow no-break space (U+202F) before AM/PM, not regular space
 TEST_CASES=(
     "$TEST_FILE"
     "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11 PM.png"
     "$TEST_DIR/Screen Shot 2024-12-25 at 10.30.45 AM.png"
+    "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11${NNBSP}PM.png"
 )
 
 for test_case in "${TEST_CASES[@]}"; do

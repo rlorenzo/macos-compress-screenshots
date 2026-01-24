@@ -46,13 +46,18 @@ is_screenshot() {
     # - Prefix: "Screen Shot" or "Screenshot"
     # - Date: YYYY-MM-DD format
     # - Time: H.MM.SS format (hour can be 1 or 2 digits, minutes and seconds are always 2 digits)
+    # - Space before AM/PM: Can be regular space (0x20) or narrow no-break space (U+202F)
+    #   macOS uses U+202F (narrow no-break space) between time and AM/PM
     # - AM/PM indicator
     # - Extension: .png
     #
     # Examples:
     # - Screen Shot 2024-01-23 at 10.30.45 AM.png (older macOS versions)
     # - Screenshot 2024-01-23 at 2.11.11 PM.png (macOS Catalina and later)
-    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2} (AM|PM)\.png$'
+    #
+    # Note: Using [^0-9] instead of a literal space to match both regular space and
+    # narrow no-break space (U+202F) that macOS uses before AM/PM
+    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[^0-9](AM|PM)\.png$'
     
     if [[ "$filename" =~ $pattern ]]; then
         return 0
@@ -135,8 +140,9 @@ monitor_directory() {
     #   -0: Use NUL character as line separator for safe file path handling
     #   -e ".*": Exclude all files by default
     #   -i "\\.png$": Include only files ending with .png
-    #   --event Created: Only monitor file creation events
-    fswatch -0 -e ".*" -i "\\.png$" --event Created "$WATCH_DIR" | while IFS= read -r -d '' file
+    #   --event Created --event Renamed: Monitor both creation and rename events
+    #     (macOS screenshots use atomic writes: temp file -> rename, which triggers Renamed not Created)
+    fswatch -0 -e ".*" -i "\\.png$" --event Created --event Renamed "$WATCH_DIR" | while IFS= read -r -d '' file
     do
         # Wait a moment to ensure file is fully written
         sleep 0.5
