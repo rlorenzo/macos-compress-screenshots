@@ -55,9 +55,11 @@ is_screenshot() {
     # - Screen Shot 2024-01-23 at 10.30.45 AM.png (older macOS versions)
     # - Screenshot 2024-01-23 at 2.11.11 PM.png (macOS Catalina and later)
     #
-    # Note: Using [^0-9] instead of a literal space to match both regular space and
-    # narrow no-break space (U+202F) that macOS uses before AM/PM
-    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[^0-9](AM|PM)\.png$'
+    # Note: Match only regular space (0x20) or narrow no-break space (U+202F)
+    # that macOS uses between the time and the AM/PM indicator
+    local space_char
+    space_char="$(printf '\342\200\257')"  # U+202F narrow no-break space
+    local pattern="^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[ ${space_char}](AM|PM)\.png$"
     
     if [[ "$filename" =~ $pattern ]]; then
         return 0

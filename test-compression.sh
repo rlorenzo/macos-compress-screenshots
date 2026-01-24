@@ -70,6 +70,10 @@ fi
 echo
 echo "Test 3: Testing screenshot pattern matching..."
 
+# Narrow no-break space (U+202F) used by macOS before AM/PM
+# Using printf with octal codes since bash 3.2 doesn't support \u escapes
+NNBSP=$(printf '\342\200\257')
+
 # Import the is_screenshot function logic without executing the main script
 is_screenshot() {
     local file="$1"
@@ -79,19 +83,15 @@ is_screenshot() {
     # macOS screenshots match these patterns:
     # - "Screen Shot" (two words): Used in macOS Mojave (10.14) and earlier
     # - "Screenshot" (one word): Used in macOS Catalina (10.15) and later
-    # Note: Using [^0-9] instead of a literal space to match both regular space and
-    # narrow no-break space (U+202F) that macOS uses before AM/PM
-    local pattern='^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[^0-9](AM|PM)\.png$'
+    # Note: Match only regular space (0x20) or narrow no-break space (U+202F)
+    # that macOS uses between the time and the AM/PM indicator
+    local pattern="^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[ ${NNBSP}](AM|PM)\.png$"
 
     if [[ "$filename" =~ $pattern ]]; then
         return 0
     fi
     return 1
 }
-
-# Narrow no-break space (U+202F) used by macOS before AM/PM
-# Using printf with octal codes since bash 3.2 doesn't support \u escapes
-NNBSP=$(printf '\342\200\257')
 
 # Test with various screenshot naming formats
 # Note: macOS uses narrow no-break space (U+202F) before AM/PM, not regular space
@@ -166,6 +166,25 @@ if is_screenshot "$NON_SCREENSHOT"; then
 else
     echo -e "${GREEN}✓ Non-screenshot correctly rejected${NC}"
 fi
+
+# Test 6: Test that invalid characters before AM/PM are rejected
+echo
+echo "Test 6: Testing rejection of invalid characters before AM/PM..."
+INVALID_CASES=(
+    "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11XPM.png"
+    "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11-PM.png"
+    "$TEST_DIR/Screenshot 2024-01-23 at 2.11.11@PM.png"
+)
+
+for invalid_case in "${INVALID_CASES[@]}"; do
+    touch "$invalid_case"
+    if is_screenshot "$invalid_case"; then
+        echo -e "${RED}✗ Invalid filename should not match: $(basename "$invalid_case")${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}✓ Invalid filename correctly rejected: $(basename "$invalid_case")${NC}"
+    fi
+done
 
 echo
 echo "======================================"
