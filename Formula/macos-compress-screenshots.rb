@@ -3,9 +3,9 @@ class MacosCompressScreenshots < Formula
   homepage "https://github.com/rlorenzo/macos-compress-screenshots"
   url "https://github.com/rlorenzo/macos-compress-screenshots/archive/refs/tags/v1.0.0.tar.gz"
   # url and sha256 are rewritten by scripts/update-formula.sh at release time.
-  # This placeholder stands until the first tag is pushed; before then the
-  # formula is only installable with `brew install --HEAD`.
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  # Do not edit them by hand - the checksum has to match the tarball GitHub
+  # generates for the tag. See HOMEBREW.md ("Cutting a release").
+  sha256 "6463f69998d038e830e476a1bf2618616cafea6de1f26e013859def3a3177adf"
   license "MIT"
   head "https://github.com/rlorenzo/macos-compress-screenshots.git", branch: "main"
 
