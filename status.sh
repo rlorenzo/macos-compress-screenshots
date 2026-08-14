@@ -143,8 +143,15 @@ echo
 #
 # Only the most recent run is inspected: once the problem is fixed and the service
 # restarts, the old error lines remain in the log and would warn forever.
+#
+# The rotated log is read first. Rotation happens mid-run, so it can carry away
+# the current run's startup marker and its errors, leaving an active log that
+# holds nothing but "Log rotated" - and a broken service then looks healthy here
+# for as long as its retry pause lasts. Reading both and taking everything after
+# the last marker finds the run wherever rotation happened to split it.
 if [ -f "$LOG_FILE" ]; then
-    LAST_RUN=$(awk '/===== compress-screenshots started =====/ {buf = ""} {buf = buf $0 ORS} END {printf "%s", buf}' "$LOG_FILE")
+    LAST_RUN=$(cat "${LOG_FILE}.old" "$LOG_FILE" 2>/dev/null \
+        | awk '/===== compress-screenshots started =====/ {buf = ""} {buf = buf $0 ORS} END {printf "%s", buf}')
     LAST_RUN_ERRORS=$(echo "$LAST_RUN" | grep "Error:" || true)
 
     if [ -n "$LAST_RUN_ERRORS" ]; then
