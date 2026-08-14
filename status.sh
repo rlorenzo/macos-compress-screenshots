@@ -14,9 +14,14 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-LABEL="com.macos.compress-screenshots"
-PLIST_NAME="${LABEL}.plist"
-LAUNCHAGENT_PATH="${HOME}/Library/LaunchAgents/$PLIST_NAME"
+#
+# There are two ways to install the service and they use different launchd
+# labels, so neither can be assumed: ./install.sh writes its own LaunchAgent,
+# while `brew services` generates one from the formula.
+MANUAL_LABEL="com.macos.compress-screenshots"
+BREW_LABEL="homebrew.mxcl.macos-compress-screenshots"
+BREW_FORMULA="macos-compress-screenshots"
+LAUNCHAGENT_DIR="${HOME}/Library/LaunchAgents"
 LOG_FILE="${HOME}/Library/Logs/compress-screenshots.log"
 
 # Set when the service is loaded but not actually doing its job
@@ -27,16 +32,61 @@ echo "Screenshot Compression Service Status"
 echo "======================================"
 echo
 
-# Check if LaunchAgent is installed
-if [ ! -f "$LAUNCHAGENT_PATH" ]; then
+# Work out which installation is present.
+#
+# Both can exist at once - installing with Homebrew does not remove an earlier
+# manual install - so an installation that is actually loaded is preferred over
+# one that is merely on disk, and any leftover is reported rather than ignored.
+LABEL=""
+ON_DISK_LABEL=""
+for candidate in "$BREW_LABEL" "$MANUAL_LABEL"; do
+    [ -f "$LAUNCHAGENT_DIR/${candidate}.plist" ] || continue
+    ON_DISK_LABEL="${ON_DISK_LABEL:-$candidate}"
+    if launchctl list "$candidate" >/dev/null 2>&1; then
+        LABEL="$candidate"
+        break
+    fi
+done
+
+# Nothing loaded, so report on whichever installation is merely present - an
+# installed but stopped service still has a status worth showing
+LABEL="${LABEL:-$ON_DISK_LABEL}"
+
+if [ -z "$LABEL" ]; then
     echo -e "${RED}✗ Service not installed${NC}"
     echo
-    echo "To install, run: ./install.sh"
+    echo "To install, either:"
+    echo "  brew install $BREW_FORMULA && brew services start $BREW_FORMULA"
+    echo "  ./install.sh   (from a clone of the repository)"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Service is installed${NC}"
+LAUNCHAGENT_PATH="$LAUNCHAGENT_DIR/${LABEL}.plist"
+
+# The commands to offer depend on which installation is in use
+if [ "$LABEL" = "$BREW_LABEL" ]; then
+    INSTALL_KIND="Homebrew"
+    OTHER_LABEL="$MANUAL_LABEL"
+    START_CMD="brew services start $BREW_FORMULA"
+    RESTART_CMD="brew services restart $BREW_FORMULA"
+    UNINSTALL_CMD="brew services stop $BREW_FORMULA && brew uninstall $BREW_FORMULA"
+else
+    INSTALL_KIND="install.sh"
+    OTHER_LABEL="$BREW_LABEL"
+    START_CMD="launchctl load $LAUNCHAGENT_PATH"
+    RESTART_CMD="launchctl unload $LAUNCHAGENT_PATH && launchctl load $LAUNCHAGENT_PATH"
+    UNINSTALL_CMD="./uninstall.sh"
+fi
+
+echo -e "${GREEN}✓ Service is installed${NC} (via $INSTALL_KIND)"
 echo "  Location: $LAUNCHAGENT_PATH"
+
+# Two installations fighting over the same folder is worth knowing about: both
+# compress the same screenshots, and stopping only one leaves the other running.
+if [ -f "$LAUNCHAGENT_DIR/${OTHER_LABEL}.plist" ]; then
+    echo -e "${YELLOW}⚠ A second installation is also present: $OTHER_LABEL${NC}"
+    echo "  Remove one of them; two services watching one folder duplicate the work."
+fi
 echo
 
 # Check if service is loaded
@@ -50,7 +100,7 @@ SERVICE_STATE=$(launchctl list "$LABEL" 2>/dev/null || true)
 if [ -z "$SERVICE_STATE" ]; then
     echo -e "${RED}✗ Service is not loaded${NC}"
     echo
-    echo "To start, run: launchctl load $LAUNCHAGENT_PATH"
+    echo "To start, run: $START_CMD"
     exit 1
 fi
 
@@ -175,8 +225,8 @@ fi
 echo "======================================"
 echo "Commands:"
 echo "  View live log: tail -f $LOG_FILE"
-echo "  Restart:       launchctl unload $LAUNCHAGENT_PATH && launchctl load $LAUNCHAGENT_PATH"
-echo "  Uninstall:     ./uninstall.sh"
+echo "  Restart:       $RESTART_CMD"
+echo "  Uninstall:     $UNINSTALL_CMD"
 echo "======================================"
 
 # Exit non-zero when the service is loaded but not actually working, so this

@@ -9,7 +9,7 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 - 💾 **Space Saving**: Reduces file sizes using pngquant compression
 - 📊 **Logging**: Tracks all compression operations with detailed statistics
 - 🔄 **Background Service**: Runs automatically in the background via LaunchAgent
-- ⚙️ **Easy Setup**: Simple installation and uninstallation scripts
+- ⚙️ **Easy Setup**: Install with Homebrew, or with a self-contained install script
 
 > 💡 **New to this tool?** Check out [EXAMPLES.md](EXAMPLES.md) for a quick start guide with usage examples!
 
@@ -22,12 +22,43 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 
 ### Installing Dependencies
 
+Both are installed for you — by Homebrew if you install the formula, or by
+`install.sh` if you agree when it offers. To install them yourself:
+
 ```bash
-# Using Homebrew
 brew install fswatch pngquant
 ```
 
 ## Installation
+
+Two options. Homebrew is less work; `install.sh` is the only one that can walk
+you through the [folder access](#folder-access-on-macos) problem interactively.
+
+### With Homebrew
+
+```bash
+brew tap rlorenzo/tap https://github.com/rlorenzo/macos-compress-screenshots
+brew install macos-compress-screenshots
+brew services start macos-compress-screenshots
+```
+
+Homebrew installs `fswatch` and `pngquant` for you and runs the service through
+its own LaunchAgent. The service reads your current screenshot location at
+startup, so it watches the right folder without being told — but if that folder
+is one macOS protects, it still cannot read it. See
+[Folder access on macOS](#folder-access-on-macos), which the formula also
+summarises after installing.
+
+Two commands cover day-to-day use:
+
+```bash
+compress-screenshots-status                       # health check
+brew services restart macos-compress-screenshots  # after changing settings
+```
+
+Maintaining the formula is documented separately in [HOMEBREW.md](HOMEBREW.md).
+
+### With install.sh
 
 1. Clone or download this repository:
 ```bash
@@ -102,13 +133,22 @@ defaults write com.apple.screencapture location ~/Screenshots
 killall SystemUIServer
 ```
 
-Then point the service at the same folder by setting `WATCH_DIR` (see
-[Configuration](#configuration)) and restart it:
+Then restart the service so it picks up the new location:
 
 ```bash
+# Homebrew
+brew services restart macos-compress-screenshots
+
+# install.sh
 launchctl unload ~/Library/LaunchAgents/com.macos.compress-screenshots.plist
 launchctl load ~/Library/LaunchAgents/com.macos.compress-screenshots.plist
 ```
+
+The service reads the screenshot location at startup, so a restart is all it
+takes. A Homebrew install needs nothing further. An `install.sh` install also
+pins `WATCH_DIR` in its LaunchAgent, and that pinned value wins — so either
+re-run `./install.sh`, or update `WATCH_DIR` by hand (see
+[Configuration](#configuration)).
 
 `~/Pictures` and any folder you create at the top level of your home directory
 work equally well.
@@ -137,7 +177,7 @@ defaults read com.apple.screencapture location
 
 If that reports `does not exist`, no override is set and macOS is using the
 Desktop. Remember that reverting to the Desktop reintroduces the access problem
-above, so update `WATCH_DIR` and use Option 2 if you go back.
+above, so use Option 2 if you go back.
 
 The same settings are available without the terminal: press **⌘⇧5**, then choose
 **Options → Save to**. That menu lists Desktop, Documents, Clipboard and
@@ -149,7 +189,10 @@ To keep screenshots on the Desktop, grant Full Disk Access to `/bin/bash`:
 
 1. Open **System Settings → Privacy & Security → Full Disk Access**
 2. Click **+**, press **⌘⇧G**, and enter `/bin/bash`
-3. Restart the service with the `launchctl` commands above
+3. Restart the service with the commands above
+
+This applies to both install methods: a `brew services` agent is subject to
+exactly the same restrictions as a hand-installed one.
 
 Be aware of the tradeoff: this grants full disk access to *every* bash script you
 run, not just this one. Option 1 is preferable for that reason.
@@ -173,10 +216,11 @@ Once installed, the service runs automatically in the background. Just take scre
 ### Checking Service Status
 
 ```bash
-./status.sh
+compress-screenshots-status   # Homebrew
+./status.sh                   # install.sh
 ```
 
-This will show:
+Both are the same script, and it recognises either installation. This will show:
 - Whether the service is installed and running
 - Process ID (PID)
 - fswatch installation status
@@ -190,21 +234,32 @@ Check compression activity and statistics:
 tail -f ~/Library/Logs/compress-screenshots.log
 ```
 
-### Stopping the Service
+### Stopping and Starting the Service
+
+With Homebrew:
+
+```bash
+brew services stop macos-compress-screenshots
+brew services start macos-compress-screenshots
+```
+
+With `install.sh`:
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.macos.compress-screenshots.plist
-```
-
-### Starting the Service
-
-```bash
 launchctl load ~/Library/LaunchAgents/com.macos.compress-screenshots.plist
 ```
 
 ## Uninstallation
 
-To completely remove the service:
+With Homebrew:
+
+```bash
+brew services stop macos-compress-screenshots
+brew uninstall macos-compress-screenshots
+```
+
+With `install.sh`:
 
 ```bash
 ./uninstall.sh
@@ -215,12 +270,16 @@ This will:
 - Remove all installed files
 - Optionally remove log files
 
+Each removes only its own installation. If you have used both, remove both —
+`./status.sh` warns when two are present, since they compete over the same
+folder.
+
 ## Configuration
 
 The main script (`compress-screenshots.sh`) can be customized by editing these variables:
 
 ```bash
-WATCH_DIR="${WATCH_DIR:-${HOME}/Desktop}"  # Directory to monitor
+WATCH_DIR="${WATCH_DIR:-$(resolve_screenshot_dir)}"  # Directory to monitor
 LOG_FILE="${LOG_FILE:-${HOME}/Library/Logs/compress-screenshots.log}"  # Log file location
 MAX_LOG_SIZE=1048576  # Maximum log file size (1MB) before rotation
 FATAL_RETRY_DELAY="${FATAL_RETRY_DELAY:-300}"  # Pause before exiting on a fatal error, to avoid a restart loop
@@ -230,14 +289,29 @@ FATAL_RETRY_DELAY="${FATAL_RETRY_DELAY:-300}"  # Pause before exiting on a fatal
 environment when one is set, so they can be changed from the LaunchAgent's
 `EnvironmentVariables` without editing the script.
 
+With no `WATCH_DIR` set, the service asks macOS where screenshots are currently
+saved (`defaults read com.apple.screencapture location`, falling back to
+`~/Desktop`) each time it starts. A Homebrew install relies on this and needs no
+configuration.
+
 ### Changing the watched folder
 
-`install.sh` sets `WATCH_DIR` in the LaunchAgent from your current screenshot
-location, so the simplest way to change the watched folder is to change where
-macOS saves screenshots and re-run `./install.sh`.
+Change where macOS saves screenshots and restart the service. That is the whole
+procedure for a Homebrew install:
 
-To point the service somewhere else by hand, edit the `EnvironmentVariables`
-dict in `~/Library/LaunchAgents/com.macos.compress-screenshots.plist`:
+```bash
+defaults write com.apple.screencapture location ~/Screenshots
+killall SystemUIServer
+brew services restart macos-compress-screenshots
+```
+
+`install.sh` additionally pins `WATCH_DIR` in the LaunchAgent it writes, and a
+pinned value takes precedence over the detected one — so with that install
+method, re-run `./install.sh` afterwards.
+
+To point that installation somewhere else by hand instead, edit the
+`EnvironmentVariables` dict in
+`~/Library/LaunchAgents/com.macos.compress-screenshots.plist`:
 
 ```xml
 <key>EnvironmentVariables</key>
@@ -282,8 +356,15 @@ Typical compression results:
 
 Check the error log:
 ```bash
+# install.sh
 cat ~/Library/Logs/compress-screenshots.error.log
+
+# Homebrew
+cat "$(brew --prefix)/var/log/macos-compress-screenshots.error.log"
 ```
+
+The tool's own compression log is at `~/Library/Logs/compress-screenshots.log`
+either way.
 
 ### fswatch not found
 
@@ -307,7 +388,7 @@ brew install pngquant
 
 1. Run the status check:
 ```bash
-./status.sh
+compress-screenshots-status   # or ./status.sh from a clone
 ```
 
    This reports whether the service is genuinely healthy, and exits non-zero if

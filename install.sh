@@ -86,6 +86,11 @@ fi
 # This matters twice over: watching the wrong folder makes the service silently
 # useless, and macOS protects ~/Desktop, ~/Documents and ~/Downloads with TCC so
 # a LaunchAgent cannot read them at all. See README.md ("Folder access on macOS").
+#
+# This deliberately repeats compress-screenshots.sh's resolve_screenshot_dir
+# rather than sourcing it: that script runs work at load time and sets its own
+# shell options, neither of which belongs in an installer. Six lines of overlap
+# is the cheaper price - but the two must agree, so change them together.
 SCREENSHOT_DIR=$(defaults read com.apple.screencapture location 2>/dev/null || true)
 if [ -z "$SCREENSHOT_DIR" ]; then
     # No override set, so macOS is using its default
