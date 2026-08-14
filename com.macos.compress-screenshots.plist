@@ -27,6 +27,11 @@
     <dict>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+
+        <!-- Folder to monitor, set by install.sh from the screenshot location
+             macOS is configured to use -->
+        <key>WATCH_DIR</key>
+        <string>WATCH_DIR_PATH</string>
     </dict>
     
     <key>ProcessType</key>

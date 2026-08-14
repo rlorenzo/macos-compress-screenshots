@@ -29,6 +29,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Load the real implementation rather than keeping a copy of it here. A copied
+# function passes its tests happily while the shipped one is broken, which is
+# exactly how the locale bug covered by Test 7 reached users. compress-screenshots.sh
+# only runs main() when executed directly, so sourcing it just defines the functions.
+SCRIPT_UNDER_TEST="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compress-screenshots.sh"
+if [ ! -f "$SCRIPT_UNDER_TEST" ]; then
+    echo -e "${RED}✗ compress-screenshots.sh not found next to this script${NC}"
+    exit 1
+fi
+
+# Keep the service's own configuration inside the test directory
+WATCH_DIR="$TEST_DIR"
+LOG_FILE="$TEST_DIR/compress-screenshots.log"
+# shellcheck source=compress-screenshots.sh
+source "$SCRIPT_UNDER_TEST"
+
 # Test 1: Check if pngquant command is available
 echo "Test 1: Checking for pngquant command..."
 if command -v pngquant >/dev/null 2>&1; then
@@ -73,25 +89,6 @@ echo "Test 3: Testing screenshot pattern matching..."
 # Narrow no-break space (U+202F) used by macOS before AM/PM
 # Using printf with octal codes since bash 3.2 doesn't support \u escapes
 NNBSP=$(printf '\342\200\257')
-
-# Import the is_screenshot function logic without executing the main script
-is_screenshot() {
-    local file="$1"
-    local filename
-    filename=$(basename "$file")
-
-    # macOS screenshots match these patterns:
-    # - "Screen Shot" (two words): Used in macOS Mojave (10.14) and earlier
-    # - "Screenshot" (one word): Used in macOS Catalina (10.15) and later
-    # Note: Match only regular space (0x20) or narrow no-break space (U+202F)
-    # that macOS uses between the time and the AM/PM indicator
-    local pattern="^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[ ${NNBSP}](AM|PM)\.png$"
-
-    if [[ "$filename" =~ $pattern ]]; then
-        return 0
-    fi
-    return 1
-}
 
 # Test with various screenshot naming formats
 # Note: macOS uses narrow no-break space (U+202F) before AM/PM, not regular space
@@ -185,6 +182,164 @@ for invalid_case in "${INVALID_CASES[@]}"; do
         echo -e "${GREEN}✓ Invalid filename correctly rejected: $(basename "$invalid_case")${NC}"
     fi
 done
+
+# Test 7: Pattern matching must not depend on the locale
+echo
+echo "Test 7: Testing pattern matching in the C locale (launchd environment)..."
+
+# launchd starts services with no locale set, which bash treats as the C locale.
+# A bracket expression containing the narrow no-break space silently fails there,
+# so every real screenshot is rejected when running as a background service while
+# the tests still pass in a UTF-8 terminal. This test runs the real script's
+# matcher under C to catch that regression.
+LOCALE_PROBE="$TEST_DIR/locale-probe.sh"
+cat > "$LOCALE_PROBE" <<'PROBE'
+source "$SCRIPT_UNDER_TEST"
+NNBSP=$(printf '\342\200\257')
+is_screenshot "Screenshot 2024-01-23 at 2.11.11${NNBSP}PM.png" || exit 1
+is_screenshot "Screenshot 2024-01-23 at 2.11.11 PM.png" || exit 2
+if is_screenshot "Screenshot 2024-01-23 at 2.11.11XPM.png"; then exit 3; fi
+exit 0
+PROBE
+
+# `env -i` clears the environment the way launchd does, so everything the script
+# needs has to be passed back in explicitly
+probe_env() {
+    env -i \
+        SCRIPT_UNDER_TEST="$SCRIPT_UNDER_TEST" \
+        HOME="$TEST_DIR" \
+        WATCH_DIR="$TEST_DIR" \
+        LOG_FILE="$TEST_DIR/locale-probe.log" \
+        "$@" /bin/bash "$LOCALE_PROBE"
+}
+
+for loc in "en_US.UTF-8" "C"; do
+    if probe_env LC_ALL="$loc"; then
+        echo -e "${GREEN}✓ Pattern behaves correctly under LC_ALL=$loc${NC}"
+    else
+        echo -e "${RED}✗ Pattern failed under LC_ALL=$loc${NC}"
+        echo "  A multi-byte bracket expression is likely being used again."
+        exit 1
+    fi
+done
+
+# And with no locale variables at all, exactly as launchd runs the service
+if probe_env; then
+    echo -e "${GREEN}✓ Pattern behaves correctly with no locale set (launchd)${NC}"
+else
+    echo -e "${RED}✗ Pattern failed with no locale set - the service would reject all screenshots${NC}"
+    exit 1
+fi
+
+# Test 8: Recognising this tool's own output
+echo
+echo "Test 8: Testing detection of already-compressed (palette) PNGs..."
+
+# pngquant writes indexed/palette PNGs while macOS screenshots are RGBA, and that
+# difference is what stops the service reprocessing its own output forever.
+PALETTE_FILE="$TEST_DIR/palette-check.png"
+cp "$TEST_FILE" "$PALETTE_FILE"
+
+if is_palette_png "$PALETTE_FILE"; then
+    echo -e "${RED}✗ An uncompressed RGBA screenshot must not look already-compressed${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Uncompressed screenshot is not treated as palette${NC}"
+
+# A non-PNG must not be misread through the fixed PNG header offsets. Byte 25 is
+# deliberately 0x03 here - the value a palette PNG carries - so this only passes
+# while the IHDR signature check in front of that offset is doing its job.
+NOT_A_PNG="$TEST_DIR/not-a-png.bin"
+FILLER=$(printf 'x%.0s' {1..25})
+printf '%s\003 trailing bytes' "$FILLER" > "$NOT_A_PNG"
+if is_palette_png "$NOT_A_PNG"; then
+    echo -e "${RED}✗ A non-PNG file must not be treated as palette${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Non-PNG file is not treated as palette${NC}"
+
+PALETTE_AVAILABLE=0
+if pngquant --quality=65-80 --skip-if-larger --force --ext .png "$PALETTE_FILE" >/dev/null 2>&1; then
+    if is_palette_png "$PALETTE_FILE"; then
+        echo -e "${GREEN}✓ pngquant output is correctly identified as palette${NC}"
+        PALETTE_AVAILABLE=1
+    else
+        echo -e "${RED}✗ pngquant output should be identified as palette${NC}"
+        echo "  Without this the service reprocesses every file it compresses."
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⚠ pngquant declined to compress the test image${NC}"
+    echo "  Cannot verify palette detection against real output on this machine."
+fi
+
+# Test 9: Compression must be idempotent
+echo
+echo "Test 9: Testing that a compressed screenshot is not compressed again..."
+
+if [ "$PALETTE_AVAILABLE" -eq 0 ]; then
+    echo -e "${YELLOW}⚠ Skipped: needs a test image pngquant will compress${NC}"
+else
+    REPEAT_FILE="$TEST_DIR/Screenshot 2024-02-01 at 9.15.30 AM.png"
+    cp "$TEST_FILE" "$REPEAT_FILE"
+
+    compress_png "$REPEAT_FILE"
+    FIRST_SUM=$(shasum "$REPEAT_FILE" | awk '{print $1}')
+    LOG_LINES_BEFORE=$(wc -l < "$LOG_FILE")
+
+    # The second call stands in for the file system event that our own write
+    # raises. It must do nothing at all: no rewrite, and no log line.
+    compress_png "$REPEAT_FILE"
+    SECOND_SUM=$(shasum "$REPEAT_FILE" | awk '{print $1}')
+    LOG_LINES_AFTER=$(wc -l < "$LOG_FILE")
+
+    if [ "$FIRST_SUM" != "$SECOND_SUM" ]; then
+        echo -e "${RED}✗ Second compression rewrote the file${NC}"
+        echo "  The service would recompress its own output on every event."
+        exit 1
+    fi
+    if [ "$LOG_LINES_BEFORE" -ne "$LOG_LINES_AFTER" ]; then
+        echo -e "${RED}✗ Second compression was not skipped silently${NC}"
+        echo "  pngquant ran again on a file this tool had already compressed."
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Already-compressed screenshot left untouched${NC}"
+fi
+
+# Test 10: Detecting a watch folder that cannot be listed
+echo
+echo "Test 10: Testing detection of an unreadable watch folder..."
+
+if ! check_watch_dir_readable; then
+    echo -e "${RED}✗ The readable test directory was reported as unreadable${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Readable folder accepted${NC}"
+
+if [ "$(id -u)" -eq 0 ]; then
+    # root ignores directory permissions, so the negative case cannot be staged
+    echo -e "${YELLOW}⚠ Skipped unreadable-folder check: running as root${NC}"
+else
+    UNREADABLE_DIR="$TEST_DIR/unreadable"
+    mkdir -p "$UNREADABLE_DIR"
+    chmod 000 "$UNREADABLE_DIR"
+
+    # Capture the result before restoring permissions, so an unreadable directory
+    # can never be left behind for the cleanup trap to trip over
+    WATCH_DIR="$UNREADABLE_DIR"
+    UNREADABLE_DETECTED=0
+    check_watch_dir_readable || UNREADABLE_DETECTED=1
+    WATCH_DIR="$TEST_DIR"
+    chmod 755 "$UNREADABLE_DIR"
+
+    if [ "$UNREADABLE_DETECTED" -eq 1 ]; then
+        echo -e "${GREEN}✓ Unreadable folder correctly reported${NC}"
+    else
+        echo -e "${RED}✗ Unreadable folder was reported as readable${NC}"
+        echo "  macOS blocking the folder would look like 'no screenshots yet'."
+        exit 1
+    fi
+fi
 
 echo
 echo "======================================"

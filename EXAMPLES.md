@@ -100,7 +100,6 @@ After installation, the tool runs automatically in the background. Just take scr
 tail -f ~/Library/Logs/compress-screenshots.log
 
 # Output shows each compression in real-time:
-# [2024-01-23 10:30:46] Detected new screenshot: Screen Shot 2024-01-23 at 10.30.45 AM.png
 # [2024-01-23 10:30:46] Compressed: Screen Shot 2024-01-23 at 10.30.45 AM.png - Original: 524288 bytes, New: 104857 bytes, Saved: 419431 bytes (80%)
 ```
 
