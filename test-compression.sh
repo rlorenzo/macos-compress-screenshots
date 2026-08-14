@@ -341,6 +341,101 @@ else
     fi
 fi
 
+# Test 11: Resolving the screenshot folder from the macOS setting
+echo
+echo "Test 11: Testing screenshot location resolution..."
+
+# This is what a Homebrew install relies on: the formula cannot ask where to
+# watch, so the service has to work the folder out for itself at startup.
+#
+# `defaults` is stubbed rather than run for real - a test must not depend on,
+# nor change, the screenshot location configured on the machine running it.
+# A shell function takes precedence over the external command of the same name.
+STUB_LOCATION=""
+STUB_LOCATION_IS_SET=1
+defaults() {
+    [ "$STUB_LOCATION_IS_SET" -eq 1 ] || return 1
+    printf '%s\n' "$STUB_LOCATION"
+}
+
+expect_resolved() {
+    local description="$1" expected="$2" actual
+    actual=$(resolve_screenshot_dir)
+    if [ "$actual" = "$expected" ]; then
+        echo -e "${GREEN}✓ $description${NC}"
+    else
+        echo -e "${RED}✗ $description: expected '$expected', got '$actual'${NC}"
+        exit 1
+    fi
+}
+
+STUB_LOCATION="$TEST_DIR/Shots"
+expect_resolved "Configured location is used" "$TEST_DIR/Shots"
+
+STUB_LOCATION="$TEST_DIR/Shots/"
+expect_resolved "Trailing slash is dropped" "$TEST_DIR/Shots"
+
+# `defaults write ... location "~/Shots"` stores the tilde literally, and a path
+# starting with one is not a path fswatch can watch. The tilde is assembled from
+# a variable because it has to stay unexpanded here, and a quoted tilde written
+# inline is the very thing linters flag as a mistake.
+LITERAL_TILDE='~'
+STUB_LOCATION="${LITERAL_TILDE}/Shots"
+expect_resolved "Leading ~ is expanded" "${HOME}/Shots"
+
+STUB_LOCATION_IS_SET=0
+expect_resolved "Unset location falls back to the Desktop" "${HOME}/Desktop"
+
+unset -f defaults
+
+# Test 12: Recognising both kinds of installation
+echo
+echo "Test 12: Testing install detection in status.sh..."
+
+STATUS_SCRIPT="$(dirname "$SCRIPT_UNDER_TEST")/status.sh"
+FAKE_HOME="$TEST_DIR/status-home"
+FAKE_LAUNCHAGENTS="$FAKE_HOME/Library/LaunchAgents"
+mkdir -p "$FAKE_LAUNCHAGENTS"
+
+BREW_PLIST="$FAKE_LAUNCHAGENTS/homebrew.mxcl.macos-compress-screenshots.plist"
+MANUAL_PLIST="$FAKE_LAUNCHAGENTS/com.macos.compress-screenshots.plist"
+
+# A fake HOME shows status.sh only the LaunchAgents this test puts there, so
+# whatever is really installed on this machine is left alone. status.sh exits
+# non-zero for any service that is not healthy - the normal case here - so its
+# output is what is checked, not its exit status.
+#
+# The report is matched with a case pattern rather than piped to grep because
+# sourcing compress-screenshots.sh turned on `pipefail` here: in a pipeline,
+# status.sh's non-zero exit would mask grep's answer entirely.
+expect_status_report() {
+    local description="$1" expected="$2" report
+    report=$(HOME="$FAKE_HOME" /bin/bash "$STATUS_SCRIPT" 2>&1 || true)
+    case "$report" in
+        *"$expected"*)
+            echo -e "${GREEN}✓ $description${NC}"
+            ;;
+        *)
+            echo -e "${RED}✗ $description: no '$expected' in the report${NC}"
+            exit 1
+            ;;
+    esac
+}
+
+expect_status_report "No LaunchAgent reads as not installed" "Service not installed"
+
+touch "$BREW_PLIST"
+expect_status_report "Homebrew installation is recognised" "(via Homebrew)"
+
+rm "$BREW_PLIST"
+touch "$MANUAL_PLIST"
+expect_status_report "install.sh installation is recognised" "(via install.sh)"
+
+# Both at once is the case worth warning about: they compress the same folder
+# twice over, and removing one leaves the other running
+touch "$BREW_PLIST"
+expect_status_report "Two installations at once are reported" "A second installation is also present"
+
 echo
 echo "======================================"
 echo -e "${GREEN}All tests passed!${NC}"

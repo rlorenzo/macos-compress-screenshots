@@ -11,7 +11,31 @@ set -euo pipefail
 # LaunchAgent's EnvironmentVariables) so screenshots can be watched outside a
 # macOS-protected folder without editing this file, and so the test suite can
 # redirect the log. See README.md ("Folder access on macOS").
-WATCH_DIR="${WATCH_DIR:-${HOME}/Desktop}"
+
+# Work out where macOS is currently configured to save screenshots.
+#
+# Resolving this at startup rather than baking it in at install time is what
+# lets the Homebrew formula work: a formula cannot ask the user anything, so it
+# has no opportunity to write the folder into the service definition. Reading
+# the setting here means the service follows the ⌘⇧5 "Save to" location on its
+# own, and a restart is all it takes to pick up a change.
+#
+# install.sh still pins WATCH_DIR in the LaunchAgent it writes, and that value
+# wins over this - it has already asked the user where to watch, so its answer
+# is more specific than the setting. It reads the same setting the same way to
+# decide what to ask about, so the two resolutions have to stay in step.
+resolve_screenshot_dir() {
+    local dir
+    dir=$(defaults read com.apple.screencapture location 2>/dev/null || true)
+    if [ -z "$dir" ]; then
+        # No override set, so macOS is using its default
+        dir="${HOME}/Desktop"
+    fi
+    dir="${dir/#\~/$HOME}"   # expand a leading ~
+    printf '%s' "${dir%/}"   # drop any trailing slash
+}
+
+WATCH_DIR="${WATCH_DIR:-$(resolve_screenshot_dir)}"
 LOG_FILE="${LOG_FILE:-${HOME}/Library/Logs/compress-screenshots.log}"
 MAX_LOG_SIZE=1048576  # 1MB
 
