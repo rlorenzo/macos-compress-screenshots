@@ -1,15 +1,24 @@
 #!/bin/bash
 #
 # compress-screenshots.sh
-# Monitors the Desktop for new PNG screenshot files and compresses them automatically
+# Monitors a folder for new PNG screenshot files and compresses them automatically
 #
 
 set -euo pipefail
 
 # Configuration
-WATCH_DIR="${HOME}/Desktop"
-LOG_FILE="${HOME}/Library/Logs/compress-screenshots.log"
+# WATCH_DIR and LOG_FILE may be overridden from the environment (e.g. via the
+# LaunchAgent's EnvironmentVariables) so screenshots can be watched outside a
+# macOS-protected folder without editing this file, and so the test suite can
+# redirect the log. See README.md ("Folder access on macOS").
+WATCH_DIR="${WATCH_DIR:-${HOME}/Desktop}"
+LOG_FILE="${LOG_FILE:-${HOME}/Library/Logs/compress-screenshots.log}"
 MAX_LOG_SIZE=1048576  # 1MB
+
+# How long to pause before exiting on a fatal configuration error. The LaunchAgent
+# has KeepAlive set, so it restarts this script forever; without a pause a
+# misconfiguration floods the log with the same error every ~10 seconds.
+FATAL_RETRY_DELAY="${FATAL_RETRY_DELAY:-300}"
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -29,6 +38,44 @@ log() {
             echo "[$timestamp] Log rotated" >> "$LOG_FILE"
         fi
     fi
+}
+
+# Function to report an unrecoverable configuration error and stop
+#
+# Pauses before exiting so the LaunchAgent's KeepAlive restart loop cannot spin
+# on the same error several times a minute.
+fatal() {
+    log "$@"
+    log "Pausing ${FATAL_RETRY_DELAY}s before exit to avoid a rapid restart loop."
+    sleep "$FATAL_RETRY_DELAY"
+    exit 1
+}
+
+# Function to verify the watch directory can actually be listed
+#
+# macOS protects ~/Desktop, ~/Documents and ~/Downloads with TCC. A LaunchAgent
+# running /bin/bash gets no access to them by default, and the failure is quiet:
+# the directory can still be stat'd, so [ -d ] succeeds, but listing it fails
+# with "Operation not permitted". Without this check that is indistinguishable
+# from "there are no screenshots yet".
+check_watch_dir_readable() {
+    local error_output
+    if error_output=$(ls -- "$WATCH_DIR" 2>&1 >/dev/null); then
+        return 0
+    fi
+
+    log "Error: Cannot read $WATCH_DIR"
+    log "  ${error_output}"
+    log "  macOS is blocking this service's access to that folder."
+    log "  Recommended fix: save screenshots to a folder macOS does not protect:"
+    log "    mkdir -p ~/Screenshots"
+    log "    defaults write com.apple.screencapture location ~/Screenshots"
+    log "    killall SystemUIServer"
+    log "    ...then point WATCH_DIR at the same folder and restart the service."
+    log "  Alternative: grant Full Disk Access to /bin/bash under"
+    log "    System Settings > Privacy & Security > Full Disk Access."
+    log "  See README.md (\"Folder access on macOS\") for details."
+    return 1
 }
 
 # Function to check if file is a screenshot
@@ -57,14 +104,47 @@ is_screenshot() {
     #
     # Note: Match only regular space (0x20) or narrow no-break space (U+202F)
     # that macOS uses between the time and the AM/PM indicator
+    #
+    # The two spaces are matched with an alternation group, NOT a bracket
+    # expression. A bracket expression containing a multi-byte character only
+    # works under a UTF-8 locale: in the C locale it is read as three separate
+    # bytes and never matches. launchd starts services with no locale set, so a
+    # bracket expression here silently rejects every real screenshot when the
+    # tool runs as a background service. The alternation form is locale-independent.
     local space_char
     space_char="$(printf '\342\200\257')"  # U+202F narrow no-break space
-    local pattern="^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}[ ${space_char}](AM|PM)\.png$"
+    local pattern="^(Screen Shot|Screenshot) [0-9]{4}-[0-9]{2}-[0-9]{2} at [0-9]{1,2}\.[0-9]{2}\.[0-9]{2}( |${space_char})(AM|PM)\.png$"
     
     if [[ "$filename" =~ $pattern ]]; then
         return 0
     fi
     return 1
+}
+
+# Function to check whether a PNG is already in pngquant's palette form
+#
+# Compressing a file rewrites it, and that write is itself a file system event,
+# so the compressed result comes straight back round to be processed again.
+# pngquant always writes indexed/palette PNGs (colour type 3) while macOS
+# screenshots are RGBA (colour type 6), so the colour type tells our own output
+# apart from a genuinely new screenshot.
+#
+# The colour type lives in the PNG header at a fixed offset:
+#   8-byte signature, 4-byte chunk length, 4-byte "IHDR", width(4), height(4),
+#   bit depth(1), colour type(1)  ->  byte 25 (zero-indexed)
+is_palette_png() {
+    local file="$1"
+
+    # Confirm this really is a PNG header before trusting a fixed offset into it
+    local ihdr
+    ihdr=$(dd if="$file" bs=1 skip=12 count=4 2>/dev/null || true)
+    if [ "$ihdr" != "IHDR" ]; then
+        return 1
+    fi
+
+    local color_type
+    color_type=$(od -An -tu1 -j 25 -N 1 "$file" 2>/dev/null | tr -d ' ')
+    [ "$color_type" = "3" ]
 }
 
 # Function to compress a PNG file
@@ -75,7 +155,15 @@ compress_png() {
     if [ ! -f "$file" ]; then
         return
     fi
-    
+
+    # Already compressed by this tool - nothing to do. This is also what stops
+    # the compression write from being picked up as a new event and processed
+    # again, so it must stay ahead of every other check. Staying silent keeps
+    # the log free of a line for every file on every pass.
+    if is_palette_png "$file"; then
+        return
+    fi
+
     # Get original size with error handling
     local original_size
     if ! original_size=$(stat -f%z "$file" 2>/dev/null); then
@@ -111,14 +199,28 @@ compress_png() {
 process_existing() {
     log "Processing existing screenshots in $WATCH_DIR"
     local count=0
-    
+
+    # Report rather than discard whatever find has to say. main() has already
+    # confirmed the folder can be listed, so an error here should be rare - but
+    # discarding this stream is exactly what once made an unreadable folder look
+    # identical to an empty one, and a rare error reported beats a rare error lost.
+    local find_errors
+    find_errors=$(mktemp)
+
     while IFS= read -r -d '' file; do
         if is_screenshot "$file"; then
             compress_png "$file"
-            ((count++))
+            count=$((count + 1))
         fi
-    done < <(find "$WATCH_DIR" -maxdepth 1 -type f -name "*.png" -print0 2>/dev/null)
-    
+    done < <(find "$WATCH_DIR" -maxdepth 1 -type f -name "*.png" -print0 2>"$find_errors")
+
+    if [ -s "$find_errors" ]; then
+        while IFS= read -r error_line; do
+            log "Warning: find: $error_line"
+        done < "$find_errors"
+    fi
+    rm -f "$find_errors"
+
     log "Processed $count existing screenshot(s)"
 }
 
@@ -128,16 +230,14 @@ monitor_directory() {
     
     # Check if required tools are available
     if ! command -v fswatch >/dev/null 2>&1; then
-        log "Error: fswatch is not installed. Please install it with: brew install fswatch"
-        exit 1
+        fatal "Error: fswatch is not installed. Please install it with: brew install fswatch"
     fi
-    
+
     if ! command -v pngquant >/dev/null 2>&1; then
-        log "Error: pngquant is not installed. Please install it with: brew install pngquant"
-        exit 1
+        fatal "Error: pngquant is not installed. Please install it with: brew install pngquant"
     fi
     
-    # Monitor the Desktop directory for new PNG files
+    # Monitor the watched directory for new PNG files
     # fswatch flags:
     #   -0: Use NUL character as line separator for safe file path handling
     #   -e ".*": Exclude all files by default
@@ -149,8 +249,9 @@ monitor_directory() {
         # Wait a moment to ensure file is fully written
         sleep 0.5
         
+        # compress_png ignores anything already in palette form, which is what
+        # keeps the event raised by our own compression write from looping
         if [ -f "$file" ] && is_screenshot "$file"; then
-            log "Detected new screenshot: $(basename "$file")"
             compress_png "$file"
         fi
     done
@@ -162,10 +263,14 @@ main() {
     
     # Check if watch directory exists
     if [ ! -d "$WATCH_DIR" ]; then
-        log "Error: Watch directory does not exist: $WATCH_DIR"
-        exit 1
+        fatal "Error: Watch directory does not exist: $WATCH_DIR"
     fi
-    
+
+    # Existing is not the same as accessible on macOS - verify we can list it
+    if ! check_watch_dir_readable; then
+        fatal "Error: Watch directory is not accessible: $WATCH_DIR"
+    fi
+
     # Process existing screenshots
     process_existing
     
@@ -173,5 +278,9 @@ main() {
     monitor_directory
 }
 
-# Run main function
-main
+# Run main function, unless this file was sourced. Sourcing lets
+# test-compression.sh exercise the real functions above instead of keeping its
+# own copy of them, which is the only way a test can catch a regression here.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main
+fi
