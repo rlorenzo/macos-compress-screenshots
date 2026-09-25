@@ -124,14 +124,16 @@ if is_protected_dir "$SCREENSHOT_DIR"; then
     if [ ! -t 0 ]; then
         # Not interactive: never change a user's settings without them saying so
         echo -e "${YELLOW}Running non-interactively - leaving the screenshot location unchanged.${NC}"
-        echo "The service will not compress anything until you either move the"
-        echo "screenshot location or grant Full Disk Access to /bin/bash."
-        echo "See README.md (\"Folder access on macOS\")."
+        echo "The service will not compress anything until you move the screenshot"
+        echo "location. See README.md (\"Folder access on macOS\")."
         echo
     else
+        # Full Disk Access is granted per-executable, not per-script, so granting it
+        # to /bin/bash would hand every bash script on the machine unrestricted
+        # access to Mail, Messages, Safari history, and other users' data - a cost
+        # this installer is not willing to ask for on the tool's behalf.
         echo "  1) Save screenshots to $SUGGESTED_DIR instead (recommended, no extra permissions)"
-        echo "  2) Keep $SCREENSHOT_DIR and grant Full Disk Access to /bin/bash yourself"
-        echo "  3) Cancel"
+        echo "  2) Cancel"
         echo
         # As above: guard `read` so end of input falls back to the default
         # instead of aborting under `set -e`
@@ -148,18 +150,6 @@ if is_protected_dir "$SCREENSHOT_DIR"; then
                 WATCH_DIR="$SUGGESTED_DIR"
                 echo -e "${GREEN}✓ Screenshots will now be saved to $SUGGESTED_DIR${NC}"
                 echo "  To undo this later: defaults delete com.apple.screencapture location && killall SystemUIServer"
-                echo
-                ;;
-            2)
-                echo -e "${YELLOW}Keeping $SCREENSHOT_DIR.${NC}"
-                echo "Grant Full Disk Access before this service can do anything:"
-                echo "  1. Open System Settings > Privacy & Security > Full Disk Access"
-                echo "  2. Click +, press Cmd-Shift-G, and enter /bin/bash"
-                echo "  3. Restart the service:"
-                echo "       launchctl unload $LAUNCHAGENT_DIR/$PLIST_NAME"
-                echo "       launchctl load $LAUNCHAGENT_DIR/$PLIST_NAME"
-                echo
-                echo "Note that this grants full disk access to every bash script you run."
                 echo
                 ;;
             *)

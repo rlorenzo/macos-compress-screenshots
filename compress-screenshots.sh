@@ -96,8 +96,9 @@ check_watch_dir_readable() {
     log "    defaults write com.apple.screencapture location ~/Screenshots"
     log "    killall SystemUIServer"
     log "    ...then point WATCH_DIR at the same folder and restart the service."
-    log "  Alternative: grant Full Disk Access to /bin/bash under"
-    log "    System Settings > Privacy & Security > Full Disk Access."
+    log "  (Full Disk Access for /bin/bash is not offered as an alternative: TCC"
+    log "  grants are per-executable, so it would open every bash script on this"
+    log "  machine, not just this one.)"
     log "  See README.md (\"Folder access on macOS\") for details."
     return 1
 }
@@ -268,11 +269,25 @@ monitor_directory() {
     #   -i "\\.png$": Include only files ending with .png
     #   --event Created --event Renamed: Monitor both creation and rename events
     #     (macOS screenshots use atomic writes: temp file -> rename, which triggers Renamed not Created)
+    #
+    # No fswatch flag disables recursion here: this platform's default monitor,
+    # fsevents_monitor, recurses into subdirectories unconditionally regardless of
+    # -r (verified against fswatch 1.22.0), and the non-recursive kqueue_monitor
+    # alternative (-m kqueue_monitor) does not reliably deliver Created/Renamed
+    # events for files at all. So process_existing's -maxdepth 1 pass and this
+    # loop are kept in agreement with an explicit depth check below instead:
+    # anything not a direct child of WATCH_DIR is ignored, so moving or renaming
+    # a file into a subfolder (e.g. an archive folder under WATCH_DIR) does not
+    # trigger a lossy in-place recompression.
     fswatch -0 -e ".*" -i "\\.png$" --event Created --event Renamed "$WATCH_DIR" | while IFS= read -r -d '' file
     do
         # Wait a moment to ensure file is fully written
         sleep 0.5
-        
+
+        if [ "$(dirname "$file")" != "$WATCH_DIR" ]; then
+            continue
+        fi
+
         # compress_png ignores anything already in palette form, which is what
         # keeps the event raised by our own compression write from looping
         if [ -f "$file" ] && is_screenshot "$file"; then
@@ -289,6 +304,12 @@ main() {
     if [ ! -d "$WATCH_DIR" ]; then
         fatal "Error: Watch directory does not exist: $WATCH_DIR"
     fi
+
+    # Resolve WATCH_DIR to its canonical path (e.g. /var/... -> /private/var/...
+    # on macOS). fswatch reports canonical paths for events, so the monitor
+    # loop's dirname check below would otherwise mismatch and skip everything,
+    # including direct children, whenever WATCH_DIR itself sits behind a symlink.
+    WATCH_DIR="$(cd "$WATCH_DIR" && pwd -P)"
 
     # Existing is not the same as accessible on macOS - verify we can list it
     if ! check_watch_dir_readable; then
