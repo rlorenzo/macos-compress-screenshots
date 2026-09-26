@@ -54,8 +54,10 @@ class MacosCompressScreenshots < Formula
         brew services restart macos-compress-screenshots
 
       The service follows that setting, so nothing else needs reconfiguring.
-      To keep screenshots on the Desktop instead, grant Full Disk Access to
-      /bin/bash - see "Folder access on macOS" in:
+      There is no supported way to keep screenshots on the Desktop instead:
+      Full Disk Access is granted per-executable, so granting it to /bin/bash
+      would open every bash script on this machine, not just this one. See
+      "Folder access on macOS" in:
         #{doc}/README.md
 
       Check on the service with:

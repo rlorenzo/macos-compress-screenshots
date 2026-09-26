@@ -16,7 +16,7 @@ Automatically compresses PNG screenshots saved to your Desktop by the macOS scre
 ## Prerequisites
 
 - macOS (any recent version)
-- Folder access for the background service — see [Folder access on macOS](#folder-access-on-macos). The default screenshot location (`~/Desktop`) is protected by macOS and needs one of the two fixes described there.
+- Folder access for the background service — see [Folder access on macOS](#folder-access-on-macos). The default screenshot location (`~/Desktop`) is protected by macOS and needs the fix described there.
 - [fswatch](https://github.com/emcrisostomo/fswatch) - File system monitoring tool
 - [pngquant](https://pngquant.org/) - High-quality PNG compression tool
 
@@ -92,16 +92,18 @@ Screenshots are currently saved to: /Users/you/Desktop
 macOS protects that folder, and this service cannot read it.
 
   1) Save screenshots to /Users/you/Screenshots instead (recommended, no extra permissions)
-  2) Keep /Users/you/Desktop and grant Full Disk Access to /bin/bash yourself
-  3) Cancel
+  2) Cancel
 
 Choice [1]:
 ```
 
 Option 1 changes your screenshot location for you; nothing is changed without
-you choosing it. When run non-interactively the installer never changes the
-setting, and tells you what to do instead. If your screenshots already go
-somewhere unprotected, no prompt appears at all and that folder is simply used.
+you choosing it. The installer does not offer granting Full Disk Access to
+`/bin/bash` as an alternative, because that permission is granted per-executable
+and would open every bash script on the machine, not just this one. When run
+non-interactively the installer never changes the setting, and tells you what
+to do instead. If your screenshots already go somewhere unprotected, no prompt
+appears at all and that folder is simply used.
 
 ## Folder access on macOS
 
@@ -120,9 +122,12 @@ are no screenshots yet". The service logs a clear error when this happens, and
 `./status.sh` reports it.
 
 Since macOS saves screenshots to the Desktop by default, a stock setup hits this.
-There are two ways to resolve it.
 
-### Option 1: save screenshots outside a protected folder (recommended)
+Full Disk Access would also fix it, but is not offered as an option: TCC grants
+that permission per-executable, so granting it to `/bin/bash` would open every
+bash script on the machine, not just this one.
+
+### Save screenshots outside a protected folder (recommended)
 
 No special permissions are needed, because only the three folders above are
 protected. Point macOS at a folder such as `~/Screenshots`:
@@ -177,25 +182,11 @@ defaults read com.apple.screencapture location
 
 If that reports `does not exist`, no override is set and macOS is using the
 Desktop. Remember that reverting to the Desktop reintroduces the access problem
-above, so use Option 2 if you go back.
+above.
 
 The same settings are available without the terminal: press **⌘⇧5**, then choose
 **Options → Save to**. That menu lists Desktop, Documents, Clipboard and
 **Other Location…** for anything else.
-
-### Option 2: grant Full Disk Access
-
-To keep screenshots on the Desktop, grant Full Disk Access to `/bin/bash`:
-
-1. Open **System Settings → Privacy & Security → Full Disk Access**
-2. Click **+**, press **⌘⇧G**, and enter `/bin/bash`
-3. Restart the service with the commands above
-
-This applies to both install methods: a `brew services` agent is subject to
-exactly the same restrictions as a hand-installed one.
-
-Be aware of the tradeoff: this grants full disk access to *every* bash script you
-run, not just this one. Option 1 is preferable for that reason.
 
 ## How It Works
 
